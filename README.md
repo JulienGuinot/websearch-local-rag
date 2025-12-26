@@ -1,35 +1,30 @@
-# RAG Service avec Recherche Web Intelligente
+# RAG (Retrieval-Augmented Generation) local 
 
-Un service RAG (Retrieval-Augmented Generation) avancé avec recherche web intelligente, suppression des stop words et analyse de sujets, utilisant Ollama pour les embeddings et la génération de réponses.
+Service RAG  avancé avec recherche web et ajout de documents.
+Le contenu est transformé en sa représentation sémantique vectorielle (embeddings), puis stocké dans une matrice (VectorStore).
+On compare ensuite l'embedding de la requete avec la matrice pour identifier les contenus les plus pertinents,
+et ainsi enrichir la requête. 
 
-## 🚀 Nouvelles Fonctionnalités
+La comparaison se fait par defaut en utilisant la similarité cosine, soit :
+```Latex
+similarité = sin(Angle entre les deux vecteurs)
+--> retourne un score de similarité compris entre 0 et 1
+```
+Elle peut aussi se faire par similarité euclidienne ou par produit scalaire.
+Cela est configurable depuis `config/config.ts`
 
-- 🧠 **Recherche intelligente** avec suppression automatique des stop words
-- 🎯 **Extraction de sujets** pour des recherches plus précises  
-- 🔄 **Recherche multi-variantes** pour une couverture exhaustive
-- 📊 **Analyse de pertinence** des termes de recherche
-- 🌐 **Optimisation automatique** des requêtes web
+## Vector store
+Les emebeddings sont enregistrés dans le vectorStore (mémoire). Celui-ci est réinitialisé à la fermeture de programme (store non persistent).
 
-## Fonctionnalités
 
-- 🧠 **RAG intelligent** avec Ollama
-- 🌐 **Recherche web** automatique (DuckDuckGo, Google, Bing)
-- 🎯 **Suppression des stop words** français et anglais
-- 🔍 **Analyse de sujets** avec scoring de pertinence
-- 📚 **Gestion de documents** avec chunking intelligent
-- 🔍 **Recherche vectorielle** avec similarité cosinus
-- 💬 **Interface CLI** interactive enrichie
-- 📊 **Statistiques** et monitoring détaillés
 
 ## Installation
 
 ```bash
-npm install
+git clone https://github.com/JulienGuinot/Skepticism
 ```
 
-## Configuration
-
-Assurez-vous qu'Ollama est installé et en cours d'exécution :
+ssurez-vous qu'Ollama est installé et en cours d'exécution :
 
 ```bash
 # Installer Ollama
@@ -39,8 +34,54 @@ curl -fsSL https://ollama.ai/install.sh | sh
 ollama serve
 
 # Télécharger les modèles nécessaires
-ollama pull llama3.2:latest
+ollama pull qwen2.5:0.5b
 ollama pull nomic-embed-text
+```
+
+
+Puis 
+
+```bash
+npm install
+npm run dev
+```
+
+## Configuration
+
+La configuration du rag se fait dans le fichier config/config.ts
+
+```typescript
+export const config: BaseConfig = {
+    ollama: {
+        baseUrl: 'http://localhost:11434',
+        model: process.env.MODEL || 'qwen2.5:0.5b',
+        embeddingModel: 'nomic-embed-text',
+        temperature: 0.7,
+        maxTokens: 2048
+    },
+    vectorStore: {
+        dimensions: 768,
+        similarity: 'cosine'
+    },
+    chunking: {
+        maxChunkSize: 500,
+        overlap: 100
+    },
+    retrieval: {
+        topK: 5,
+        threshold: 0.7
+    },
+    webSearch: {
+        searchEngine: "duckduckgo",
+        maxResults: 10,
+        timeout: 15000,
+        retryAttempts: 1,
+        retryDelay: 1000,
+        minContentLength: 200,
+        excludeDomains: ["youtube.com"],
+        includeDomains: [],
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
 ```
 
 ## Utilisation
@@ -48,12 +89,12 @@ ollama pull nomic-embed-text
 ### CLI Interactif
 
 ```bash
-npm start
+npm run cli
 ```
 
 ### Commandes disponibles
 
-- `search <query>` - **Recherche intelligente** avec analyse automatique et enrichissement web si nécessaire
+- `search <query>` - Recherche avec analyse automatique et enrichissement web si nécessaire
 - `add-web <query>` - Ajouter du contenu depuis le web avec analyse intelligente
 - `add-file <path>` - Ajouter un fichier texte à la base
 - `stats` - Afficher les statistiques de la base
@@ -61,14 +102,22 @@ npm start
 - `help` - Afficher l'aide
 - `exit` - Quitter
 
+
+### Serveur web
+```bash
+npm run dev #Développement 
+npm run build 
+npm start #Version build  
+```
+
+
 ### Exemples d'utilisation
 
-#### Recherche intelligente automatique
 ```
-Skepticism> search comment fonctionne le machine learning avec des réseaux de neurones
+Skepticism> Comment fonctionne le machine learning avec des réseaux de neurones
 🔍 Recherche intelligente: "comment fonctionne le machine learning avec des réseaux de neurones"
 ✓ Recherche dans la base existante...
-✓ Base existante insuffisante, recherche comprehensive...
+✓ Base existante insuffisante, recherche web en cours...
 
 📊 Analyse automatique:
   Sujets identifiés: machine, learning, réseaux, neurones
@@ -90,136 +139,64 @@ Skepticism> search comment fonctionne le machine learning avec des réseaux de n
   2 https://example.com/ml-fundamentals
 ```
 
-#### Ajout de contenu intelligent
-```
-Skepticism> add-web intelligence artificielle et machine learning pour les débutants
-🌐 Ajout de contenu web intelligent: "intelligence artificielle et machine learning pour les débutants"
-✓ 5 documents ajoutés avec succès!
 
-📊 Analyse des sujets:
-  Sujets identifiés: intelligence, artificielle, machine, learning, débutants
-  Stop words supprimés: et, pour, les
-  Requête optimisée: "intelligence artificielle machine learning débutants"
-```
 
-## Architecture
+## Limitations du Rag
 
-```
-services/
-├── rag.service.ts      # Service principal RAG avec recherche intelligente
-├── ollama.service.ts   # Interface avec Ollama
-├── vector.service.ts   # Store vectoriel en mémoire
-└── websearch.service.ts # Recherche web multi-moteurs + intelligence
 
-utils/
-├── chunking.ts         # Découpage intelligent de texte
-└── stopwords.ts        # 🆕 Gestion des stop words et analyse de sujets
+La transformation du contenu ajouté en embeddings peut prendre un certain temps. c'est le principal goulot d'étranglement de ce système. On pourrait utiliser un odèle plus petit pour générer les embeddings, comme "miniailm", ou passer le texte de la recherche web / document directement, mais on perdrait le ranking des chunks, et la réponse finale pourrait être moins pertinente
 
-types/
-├── rag.ts             # Types pour le RAG
-└── webSearch.ts       # Types pour la recherche web
-```
 
-## Fonctionnalités de l'analyse intelligente
 
-### Suppression des stop words
-- **Français** : le, la, les, de, du, avec, pour, dans, sur, etc.
-- **Anglais** : the, a, an, and, or, but, in, on, at, etc.
-- **Personnalisable** : ajout de mots spécifiques à ignorer
+## Architecture 
 
-### Extraction de sujets
-- Identification automatique des termes importants
-- Préservation des noms propres (majuscules)
-- Filtrage par longueur minimale
-- Limitation du nombre de sujets
 
-### Génération de variantes
-- Requête complète optimisée
-- Combinaisons de 2 sujets
-- Termes individuels importants
-- Déduplication automatique
-
-### Analyse de pertinence
-- Score basé sur la longueur, majuscules, chiffres
-- Catégorisation : HIGH, MEDIUM, LOW
-- Priorisation des termes techniques et spécifiques
-
-## Configuration avancée
+### Injection de dépendences avec Awilix
+le RAG est orchéstré par la classe `services/rag.service.ts` la classe doit être instanciée avec un objet `{di}`, exporté depuis `services/di-container` qui expose les services et gère les états, pour éviter la multi-instanciation des classes et la perte des états
 
 ```typescript
-const config: RAGConfig = {
-  ollama: {
-    baseUrl: 'http://localhost:11434',
-    model: 'llama3.2:latest',
-    embeddingModel: 'nomic-embed-text',
-    temperature: 0.7,
-    maxTokens: 2048
-  },
-  vectorStore: {
-    dimensions: 768,
-    similarity: 'cosine'
-  },
-  chunking: {
-    maxChunkSize: 1000,
-    overlap: 200
-  },
-  retrieval: {
-    topK: 5,
-    threshold: 0.7
-  }
-};
-
-// Options pour l'extraction de sujets
-const topicOptions: TopicExtractionOptions = {
-  language: 'both', // 'fr' | 'en' | 'both'
-  minWordLength: 3,
-  maxTopics: 8,
-  customStopWords: ['custom', 'words'],
-  preserveCapitalized: true
-};
+export const di = {
+    aiService: container.resolve<OllamaService>("aiService"),
+    vectorStore: container.resolve<VectorStore>("vectorStore"),
+    searchService: container.resolve<SearchService>("searchService"),
+    textChunker: container.resolve<TextChunker>("textChunker")
+}
 ```
 
-## 🎯 Comment utiliser les commandes ?
 
-### Pour **rechercher** et obtenir une réponse :
-```bash
-search comment fonctionne l'intelligence artificielle
+puis, on initialise le RagService en lui passant l'objet `{di}`
+```typescript
+const ragService = new RAGService(di);
 ```
-→ Recherche intelligente automatique avec enrichissement si nécessaire
+### Fonction "Factory" performSearch
+Permet de changer le moteur de recherche utilisé par le RAG, en une seule ligne, depuis la config
+```typescript
+export async function performSearch(
+    query: string,
+    searchEngine: SearchEngine,
+    config: WebSearchConfig,
+    userAgent: string
+): Promise<SearchResult[]> {
 
-### Pour **enrichir** ta base de connaissances :
-```bash
-add-web transformers attention mechanism deep learning
+    switch (searchEngine) {
+        case 'duckduckgo':
+            return await searchDuckDuckGo(query, config, userAgent);
+        case "bing":
+            return await searchWithBing(query, config, userAgent)
+        case "google":
+            return await searchWithGoogle(query, config, userAgent)
+        default:
+            return await searchDuckDuckGo(query, config, userAgent);
+    }
+}
 ```
-→ Ajoute du contenu web avec analyse intelligente
 
-### Pour **ajouter** tes propres documents :
-```bash
-add-file ./mon-document.txt
-```
-→ Ajoute un fichier local à la base
 
-### Pour **voir** l'état de ta base :
-```bash
-stats
-```
-→ Statistiques et sources disponibles
 
-La commande **`search`** fait maintenant tout le travail automatiquement : elle analyse ta requête, enrichit la base si nécessaire avec une recherche comprehensive, puis génère une réponse optimale.
 
-## Développement
+## Contribution 
+Toutes les contributions sont les bienvenues !
 
-```bash
-# Développement avec rechargement automatique
-npm run dev
-
-# Build
-npm run build
-
-# Tests
-npm test
-```
 
 ## Licence
-
 MIT

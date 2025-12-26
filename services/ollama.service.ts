@@ -1,22 +1,21 @@
 
+import { config } from '../config/config';
 import { OllamaConfig } from '../types/rag';
 
 export class OllamaService {
-    private readonly config: Required<OllamaConfig> & { embeddingModel: string };
+    private readonly config: OllamaConfig = config.ollama
 
-    constructor(config: OllamaConfig) {
-        this.config = {
-            baseUrl: config.baseUrl ?? 'http://localhost:11434',
-            model: config.model,
-            embeddingModel: config.embeddingModel ?? 'nomic-embed-text',
-            temperature: config.temperature ?? 0.7,
-            maxTokens: config.maxTokens ?? 2048
-        };
-    }
+    // constructor(config: OllamaConfig) {
+    //     // this.config = {
+    //     //     baseUrl: config.baseUrl ?? 'http://localhost:11434',
+    //     //     model: config.model,
+    //     //     embeddingModel: config.embeddingModel ?? 'nomic-embed-text',
+    //     //     temperature: config.temperature ?? 0.7,
+    //     //     maxTokens: config.maxTokens ?? 2048
+    //     // };
+    // }
 
-    /**
-     * Génère des embeddings pour un texte
-     */
+
     async generateEmbedding(text: string): Promise<number[]> {
         try {
             // Vérification du modèle d'abord
@@ -55,10 +54,50 @@ export class OllamaService {
      * Génère des embeddings pour plusieurs textes
      */
     async generateEmbeddings(texts: string[]): Promise<number[][]> {
-        const embeddings = await Promise.all(
-            texts.map(text => this.generateEmbedding(text))
-        );
-        return embeddings;
+        const startTime = performance.now();
+
+        try {
+            //await this._ensureModelExists();
+
+            const response = await fetch(`${this.config.baseUrl}/api/embed`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: this.config.embeddingModel,
+                    input: texts.map(t => t.trim())
+                })
+            });
+
+
+
+            if (!response.ok) {
+                const data = await response.json()
+                throw new Error(`Ollama API error: ${response.status} ${data}`);
+            }
+
+            const data: any = await response.json();
+            console.log("EMBEDDINGS response: ", data)
+
+            if (!data.embeddings || !Array.isArray(data.embeddings)) {
+                throw new Error('Format de réponse embeddings invalide');
+            }
+
+            const endTime = performance.now();
+            const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+            console.log(`✓ Embeddings générés pour ${texts.length} texte(s) en ${duration}s`);
+
+            return data.embeddings;
+
+        } catch (error: any) {
+            const endTime = performance.now();
+            const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+            console.error(`✗ Erreur après ${duration}s`);
+            throw new Error(`Erreur génération embeddings: ${error.message}`);
+        }
     }
 
     /**
@@ -183,8 +222,8 @@ export class OllamaService {
         Structure your answer clearly in Markdown format
 
         `
-            
-        ;
+
+            ;
     }
 
     private _buildUserPrompt(query: string, context: string[]): string {

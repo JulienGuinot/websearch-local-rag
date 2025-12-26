@@ -62,3 +62,6 @@ export interface RAGConfig {
     threshold: number;
   };
 }
+
+
+export type SearchEngine = 'google' | 'bing' | 'duckduckgo'

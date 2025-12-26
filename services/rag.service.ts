@@ -1,8 +1,4 @@
-import { OllamaService } from './ollama.service';
-import { VectorStore } from './vector.service';
-import { WebSearch } from './websearch.service';
-import { TextChunker } from '../utils/chunking';
-import { extractTopics, TopicExtractionOptions } from '../utils/stopwords';
+import { extractTopics } from '../utils/stopwords';
 import {
   Document,
   Chunk,
@@ -11,39 +7,27 @@ import {
   RAGConfig
 } from '../types/rag';
 import { ExtractedContent } from '../types/webSearch';
+import { VectorStore } from './vector.store';
+import BaseContext from '../contexts/base-context';
+import { config } from '../config/config';
+import { normalizeText } from '../utils/rag.utils';
 
-export class RAGService {
-  private readonly ollama: OllamaService;
-  private readonly vectorStore: VectorStore;
-  private readonly webSearch: WebSearch;
-  private readonly chunker: TextChunker;
-  private readonly config: RAGConfig;
-
-  constructor(config: RAGConfig) {
-    this.config = config;
-    this.ollama = new OllamaService(config.ollama);
-    this.vectorStore = new VectorStore(config.vectorStore);
-    this.webSearch = new WebSearch();
-    this.chunker = new TextChunker(config.chunking);
-  }
-
+export class RAGService extends BaseContext {
+  private readonly config: RAGConfig = config as RAGConfig
 
   async initialize(): Promise<void> {
-    const isOllamaAvailable = await this.ollama.isAvailable();
+    const isOllamaAvailable = await this.di.aiService.isAvailable();
     if (!isOllamaAvailable) {
       throw new Error('Ollama n\'est pas disponible. Vérifiez que le service est démarré.');
     }
 
-    console.log(`RAG initialisé avec le modèle: ${this.ollama.modelName}`);
+    console.log(`RAG initialisé avec le modèle: ${this.di.aiService.modelName}`);
   }
 
-  /**
-   * Ajoute du contenu au RAG depuis une recherche web intelligente
-   */
+
   async addFromWebSearch(
     query: string,
     maxResults: number = 5,
-    useSmartSearch: boolean = false,
     silent: boolean = false
   ): Promise<{
     documentsAdded: number;
@@ -58,39 +42,16 @@ export class RAGService {
         return { documentsAdded: 0, executedQueries: [] };
       }
 
-      if (!silent) console.log(`🔍 Recherche web pour: "${query}"`);
+      console.log(`🔍 Recherche web pour: "${query}"`);
 
       let extractedContents: ExtractedContent[];
       let topicAnalysis: ReturnType<typeof extractTopics> | undefined;
       let executedQueries: string[] = [];
 
-      if (useSmartSearch) {
-        // Utilise la recherche intelligente avec suppression des stop words
-        const smartResult = await this.webSearch.smartSearch(query, 'duckduckgo', {
-          language: 'both',
-          minWordLength: 3,
-          maxTopics: 6,
-          preserveCapitalized: true
-        }, {
-          maxResults
-        });
+      extractedContents = await this.di.searchService.searchAndExtract(query, 'duckduckgo', maxResults);
+      executedQueries = [query];
 
-        extractedContents = smartResult.results;
-        topicAnalysis = smartResult.topicAnalysis;
-        executedQueries = smartResult.executedQueries;
-
-        if (!silent) {
-          console.log(`📊 Sujets identifiés: ${topicAnalysis.topics.join(', ')}`);
-          console.log(`🗑️ Stop words supprimés: ${topicAnalysis.removedWords.join(', ')}`);
-          if (smartResult.executedQueries.length > 0) {
-            console.log(`🔁 Requêtes exécutées: ${smartResult.executedQueries.join(' | ')}`);
-          }
-        }
-      } else {
-        // Recherche classique
-        extractedContents = await this.webSearch.searchAndExtract(query, 'duckduckgo', maxResults);
-        executedQueries = [query];
-      }
+      console.log("addFromWebSearch - Recherche web terminée")
 
       const successfulContents = extractedContents
         .filter(content => content.success && content.content.length > 100)
@@ -103,7 +64,8 @@ export class RAGService {
       const documents = this._convertToDocuments(successfulContents);
       await this.addDocuments(documents);
 
-      if (!silent) console.log(`✅ ${documents.length} documents ajoutés au RAG`);
+
+      console.log(`✅ ${documents.length} documents ajoutés au RAG`);
 
       return {
         documentsAdded: documents.length,
@@ -116,86 +78,18 @@ export class RAGService {
     }
   }
 
-  /**
-   * Recherche exhaustive avec plusieurs variantes de sujets
-   */
-  async addFromComprehensiveSearch(
-    query: string,
-    options: {
-      maxResults?: number;
-      maxVariants?: number;
-      topicOptions?: TopicExtractionOptions;
-      silent?: boolean;
-    } = {}
-  ): Promise<{
-    documentsAdded: number;
-    topicAnalysis: ReturnType<typeof extractTopics>;
-    searchVariants: string[];
-    executedQueries: string[];
-  }> {
-    try {
-      const { maxResults = 8, maxVariants = 3, topicOptions = {}, silent = false } = options;
-
-      if (!silent) console.log(`🔍 Recherche exhaustive pour: "${query}"`);
-
-      const comprehensiveResult = await this.webSearch.comprehensiveSearch(
-        query,
-        'duckduckgo',
-        {
-          maxVariants,
-          topicOptions: {
-            language: 'both',
-            minWordLength: 3,
-            maxTopics: 6,
-            ...topicOptions
-          },
-          deduplicateResults: true,
-          maxResults
-        }
-      );
-
-      const successfulContents = comprehensiveResult.allResults
-        .filter(content => content.success && content.content.length > 100)
-        .slice(0, maxResults);
-
-      if (successfulContents.length === 0) {
-        throw new Error('Aucun contenu valide trouvé lors de la recherche exhaustive');
-      }
-
-      const documents = this._convertToDocuments(successfulContents);
-      await this.addDocuments(documents);
-
-      if (!silent) {
-        console.log(`✅ Recherche exhaustive terminée: ${documents.length} documents ajoutés`);
-        if (comprehensiveResult.executedQueries.length > 0) {
-          console.log(`🔁 Requêtes exécutées: ${comprehensiveResult.executedQueries.join(' | ')}`);
-        }
-      }
-
-      return {
-        documentsAdded: documents.length,
-        topicAnalysis: comprehensiveResult.topicAnalysis,
-        searchVariants: comprehensiveResult.executedQueries.filter((variant, index, arr) =>
-          variant !== query && arr.indexOf(variant) === index
-        ),
-        executedQueries: comprehensiveResult.executedQueries
-      };
-
-    } catch (error: any) {
-      throw new Error(`Erreur recherche exhaustive: ${error.message}`);
-    }
-  }
-
 
   async addDocuments(documents: Document[]): Promise<void> {
     try {
-      // Chunking des documents
-      const chunks = this.chunker.chunkDocuments(documents);
-
-      // Génération des embeddings
+      console.log("Debut du chunkage")
+      const chunks = this.di.textChunker.chunkDocuments(documents);
+      console.log("Chunkage terminé - extrait: ", chunks.length, "chunks")
       const contents = chunks.map(chunk => chunk.content);
-      const embeddings = await this.ollama.generateEmbeddings(contents);
 
+
+      console.log("addDocs - Generation des embeddings")
+      const embeddings = await this.di.aiService.generateEmbeddings(contents);
+      console.log("Embeddings generes")
 
       // Ajout des embeddings aux chunks
       const chunksWithEmbeddings: Chunk[] = chunks.map((chunk, index) => ({
@@ -203,8 +97,7 @@ export class RAGService {
         embedding: embeddings[index]
       }));
 
-      // Stockage dans le vector store
-      await this.vectorStore.addChunks(chunksWithEmbeddings);
+      await this.di.vectorStore.addChunks(chunksWithEmbeddings);
 
     } catch (error: any) {
       throw new Error(`Erreur ajout documents: ${error.message}`);
@@ -215,23 +108,26 @@ export class RAGService {
   async search(searchQuery: SearchQuery): Promise<RAGResponse> {
     try {
       const startTime = Date.now();
-      // On normalise l'input
-      const normalizedInput = this._normalizeText(searchQuery.query)
+      const normalizedInput = normalizeText(searchQuery.query)
+      const queryEmbedding = await this.di.aiService.generateEmbedding(normalizedInput);
 
-      // Génère l'embedding de la requête
-      const queryEmbedding = await this.ollama.generateEmbedding(normalizedInput);
+
+      console.log("Embedding  de la requete effectué", queryEmbedding.length)
 
       // Recherche dans le vector store
       const topK = searchQuery.topK ?? this.config.retrieval.topK;
       const threshold = searchQuery.threshold ?? this.config.retrieval.threshold;
 
-      let relevantChunks = await this.vectorStore.search(queryEmbedding, topK, threshold);
+      let relevantChunks = await this.di.vectorStore.search(queryEmbedding, topK, threshold);
 
       // Recherche web additionnelle si demandée et pas assez de résultats
       if (searchQuery.includeWebSearch && relevantChunks.length < topK) {
+        console.log("Enrichissement via recherche web")
         await this._enhanceWithWebSearch(searchQuery, topK - relevantChunks.length);
+        console.log("Recherche web terminée, ajout au vector store")
         // Re-recherche après ajout du contenu web
-        relevantChunks = await this.vectorStore.search(queryEmbedding, topK, threshold);
+        relevantChunks = await this.di.vectorStore.search(queryEmbedding, topK, threshold);
+        console.log("Relevant chunks trouvées", relevantChunks.length)
       }
 
       if (relevantChunks.length === 0) {
@@ -245,7 +141,7 @@ export class RAGService {
 
       // Génération de la réponse
       const context = relevantChunks.map(chunk => chunk.content);
-      const answer = await this.ollama.generateResponse(searchQuery.query, context);
+      const answer = await this.di.aiService.generateResponse(searchQuery.query, context);
 
       const response: RAGResponse = {
         answer,
@@ -274,9 +170,7 @@ export class RAGService {
       if (webResults <= 0) {
         return;
       }
-      console.log(`🔍 Recherche web additionnelle intelligente: ${webResults} résultats`);
 
-      // Utilise la recherche intelligente pour de meilleurs résultats
       const result = await this.addFromWebSearch(searchQuery.query, webResults, true);
 
       if (result.topicAnalysis) {
@@ -287,24 +181,8 @@ export class RAGService {
       }
     } catch (error) {
       console.warn('⚠️ Erreur lors de la recherche web additionnelle:', error);
-      // Continue sans la recherche web
     }
   }
-
-
-
-
-
-  private _normalizeText(text: string): string {
-    return text
-      .toLowerCase()                    // Casse uniforme
-      .normalize('NFD')                 // Décompose les accents
-      .replace(/[\u0300-\u036f]/g, '') // Supprime les accents
-      .replace(/[^\w\s]/g, ' ')        // Remplace ponctuation par espaces
-      .replace(/\s+/g, ' ')            // Normalise les espaces
-      .trim();
-  }
-
 
 
 
@@ -331,15 +209,15 @@ export class RAGService {
     };
   }> {
     const [vectorStats, ollamaAvailable] = await Promise.all([
-      this.vectorStore.getStats(),
-      this.ollama.isAvailable()
+      this.di.vectorStore.getStats(),
+      this.di.aiService.isAvailable()
     ]);
 
     return {
       vectorStore: vectorStats,
       config: this.config,
       ollama: {
-        model: this.ollama.modelName,
+        model: this.di.aiService.modelName,
         available: ollamaAvailable
       }
     };
@@ -347,48 +225,19 @@ export class RAGService {
 
 
   async removeSource(source: string): Promise<void> {
-    await this.vectorStore.removeBySource(source);
+    await this.di.vectorStore.removeBySource(source);
     console.log(`Supprimé le contenu de la source: ${source}`);
   }
 
 
   async clear(): Promise<void> {
-    await this.vectorStore.clear();
+    await this.di.vectorStore.clear();
   }
 
   async listAvailableModels(): Promise<string[]> {
-    return await this.ollama.listModels();
+    return await this.di.aiService.listModels();
   }
 
 
-  async diagnose(): Promise<{
-    ollama: {
-      available: boolean;
-      models: string[];
-      embeddingTest: { success: boolean; error?: string; dimensions?: number };
-    };
-    vectorStore: {
-      chunks: number;
-      sources: number;
-    };
-  }> {
-    const [ollamaAvailable, models, embeddingTest, vectorStats] = await Promise.all([
-      this.ollama.isAvailable(),
-      this.ollama.listModels().catch(() => []),
-      this.ollama.testEmbedding(),
-      this.vectorStore.getStats()
-    ]);
 
-    return {
-      ollama: {
-        available: ollamaAvailable,
-        models,
-        embeddingTest
-      },
-      vectorStore: {
-        chunks: vectorStats.totalChunks,
-        sources: vectorStats.sources.length
-      }
-    };
-  }
 }

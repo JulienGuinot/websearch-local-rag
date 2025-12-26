@@ -1,35 +1,14 @@
 import express from 'express';
 import { RAGService } from './services/rag.service';
-import { RAGConfig } from './types/rag';
+import { di } from './services/di-container';
 
 const app = express();
 app.use(express.json());
 
-// Configuration par défaut
-const defaultConfig: RAGConfig = {
-    ollama: {
-        baseUrl: 'http://localhost:11434',
-        model: process.env.MODEL || 'llama3.2:latest', // Modèle pour la génération de texte
-        embeddingModel: 'nomic-embed-text', // Modèle pour les embeddings
-        temperature: 0.7,
-        maxTokens: 2048
-    },
-    vectorStore: {
-        dimensions: 768, // Dimensions pour nomic-embed-text
-        similarity: 'cosine'
-    },
-    chunking: {
-        maxChunkSize: 1000,
-        overlap: 200
-    },
-    retrieval: {
-        topK: 5,
-        threshold: 0.7
-    }
-};
+
 
 // Initialisation du service RAG
-const ragService = new RAGService(defaultConfig);
+const ragService = new RAGService(di);
 
 // Middleware d'initialisation
 app.use(async (req, res, next) => {
@@ -43,11 +22,8 @@ app.use(async (req, res, next) => {
     }
 });
 
-// Routes API
 
-/**
- * POST /search - Effectue une recherche RAG
- */
+
 app.post('/search', async (req, res) => {
     console.log("Requete recue", req.body.query!)
     try {
@@ -72,9 +48,7 @@ app.post('/search', async (req, res) => {
     }
 });
 
-/**
- * POST /add-web-content - Ajoute du contenu depuis une recherche web
- */
+
 app.post('/add-web-content', async (req, res) => {
     try {
         const { query, maxResults = 5 } = req.body;
@@ -90,9 +64,7 @@ app.post('/add-web-content', async (req, res) => {
     }
 });
 
-/**
- * POST /add-document - Ajoute un document manuel
- */
+
 app.post('/add-document', async (req, res) => {
     try {
         const { content, title, source = 'manual' } = req.body;
@@ -118,9 +90,7 @@ app.post('/add-document', async (req, res) => {
     }
 });
 
-/**
- * GET /stats - Obtient les statistiques du RAG
- */
+
 app.get('/stats', async (req, res) => {
     try {
         const stats = await ragService.getStats();
@@ -130,9 +100,7 @@ app.get('/stats', async (req, res) => {
     }
 });
 
-/**
- * DELETE /source/:source - Supprime le contenu d'une source
- */
+
 app.delete('/source/:source', async (req, res) => {
     try {
         const { source } = req.params;
@@ -143,9 +111,7 @@ app.delete('/source/:source', async (req, res) => {
     }
 });
 
-/**
- * DELETE /clear - Vide complètement le RAG
- */
+
 app.delete('/clear', async (req, res) => {
     try {
         await ragService.clear();
@@ -155,9 +121,6 @@ app.delete('/clear', async (req, res) => {
     }
 });
 
-/**
- * GET /models - Liste les modèles Ollama disponibles
- */
 app.get('/models', async (req, res) => {
     try {
         const models = await ragService.listAvailableModels();
@@ -167,9 +130,7 @@ app.get('/models', async (req, res) => {
     }
 });
 
-/**
- * GET /health - Vérification de santé
- */
+
 app.get('/health', async (req, res) => {
     try {
         const stats = await ragService.getStats();
@@ -186,19 +147,9 @@ app.get('/health', async (req, res) => {
     }
 });
 
-/**
- * GET /diagnose - Diagnostic complet du système
- */
-app.get('/diagnose', async (req, res) => {
-    try {
-        const diagnosis = await ragService.diagnose();
-        res.json(diagnosis);
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
-});
 
-// Initialisation du serveur
+
+
 const PORT = process.env.PORT || 3000;
 
 async function startServer() {

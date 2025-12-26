@@ -6,20 +6,18 @@ export interface ChunkingConfig {
   separators?: string[];
 }
 
-export class TextChunker {
-  private readonly config: ChunkingConfig;
+export class TextChunkerService {
+  private readonly config = {
+    maxChunkSize: 1000,
+    overlap: 150,
+    separators: ['\n\n', '\n', '. ', '! ', '? ', ' '],
+  };
 
-  constructor(config: ChunkingConfig) {
-    this.config = {
-      ...config,
-      separators: config.separators ?? ['\n\n', '\n', '. ', '! ', '? ', ' ']
-    };
-  }
 
 
   chunkDocument(document: Document): Chunk[] {
     const chunks = this._splitText(document.content);
-    
+
     return chunks.map((content, index) => ({
       id: `${document.id}_chunk_${index}`,
       content: content.trim(),
@@ -47,8 +45,8 @@ export class TextChunker {
       const chunks = this._splitBySeparator(text, separator);
       if (chunks.length > 1) {
         // Récursivement divise les chunks trop grands
-        return chunks.flatMap(chunk => 
-          chunk.length > this.config.maxChunkSize 
+        return chunks.flatMap(chunk =>
+          chunk.length > this.config.maxChunkSize
             ? this._splitText(chunk)
             : [chunk]
         );
@@ -69,14 +67,14 @@ export class TextChunker {
 
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i] + (i < parts.length - 1 ? separator : '');
-      
+
       if ((currentChunk + part).length <= this.config.maxChunkSize) {
         currentChunk += part;
       } else {
         if (currentChunk) {
           chunks.push(currentChunk.trim());
         }
-        
+
         // Commence le nouveau chunk avec overlap si possible
         currentChunk = this._addOverlap(chunks, part);
       }
@@ -96,7 +94,7 @@ export class TextChunker {
 
     while (start < text.length) {
       let end = start + this.config.maxChunkSize;
-      
+
       // Essaie de couper à un espace pour éviter de couper les mots
       if (end < text.length) {
         const lastSpace = text.lastIndexOf(' ', end);
@@ -123,7 +121,7 @@ export class TextChunker {
 
     const lastChunk = existingChunks[existingChunks.length - 1];
     const overlapText = lastChunk.slice(-this.config.overlap);
-    
+
     return overlapText + newPart;
   }
 

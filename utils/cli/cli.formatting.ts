@@ -89,3 +89,20 @@ export const formatMarkdown = (text: string): string => {
 
     return formatted;
 };
+
+
+
+
+export function showLoadingSpinner(message: string): NodeJS.Timeout {
+    const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+    let i = 0;
+    return setInterval(() => {
+        process.stdout.write(`\r${colorize(frames[i], colors.cyan)} ${message}`);
+        i = (i + 1) % frames.length;
+    }, 100);
+}
+
+export function stopSpinner(spinner: NodeJS.Timeout, message: string) {
+    clearInterval(spinner);
+    process.stdout.write(`\r${success('✓')} ${message}\n`);
+}
