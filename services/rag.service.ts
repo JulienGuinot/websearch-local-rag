@@ -15,8 +15,10 @@ import { IGNORED_DIRS, SUPPORTED_EXTENSIONS } from "../config/files";
 export class RAGService extends BaseContext {
   async initialize(): Promise<void> {
     const isOllamaAvailable = await this.di.aiService.isAvailable();
-    const cwd = process.cwd();
-    await this.addFolder(cwd);
+
+    // C'est pratique pour un dossier de code mais ca devient inutilisable si la cli est lancée depuis le path de base
+    //const cwd = process.cwd();
+    //await this.addFolder(cwd);
 
     if (!isOllamaAvailable) {
       throw new Error(
@@ -131,9 +133,14 @@ export class RAGService extends BaseContext {
           threshold
         );
       }
+      const sources = relevantChunks.map(
+        (chunk) =>
+          chunk.metadata.title || chunk.metadata.url || chunk.metadata.source
+      );
+      const uniqueSources = new Set(sources);
 
-      relevantChunks.forEach((chunk) => {
-        console.log(`Analysé ${chunk.metadata.title ?? chunk.metadata.url}`);
+      uniqueSources.forEach((source) => {
+        console.log(`Analysé ${source}`);
       });
 
       // Recherche web additionnelle si demandée et pas assez de résultats

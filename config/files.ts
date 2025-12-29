@@ -9,6 +9,7 @@ export const SUPPORTED_EXTENSIONS = [
   ".tsx",
   ".py",
   ".java",
+  ".rs",
   ".c",
   ".cpp",
   ".h",

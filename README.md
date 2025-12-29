@@ -1,22 +1,23 @@
-# RAG (Retrieval-Augmented Generation) local 
+# RAG (Retrieval-Augmented Generation) local
 
-Service RAG  avancé avec recherche web et ajout de documents.
+Service RAG avancé avec recherche web et ajout de documents.
 Le contenu est transformé en sa représentation sémantique vectorielle (embeddings), puis stocké dans une matrice (VectorStore).
 On compare ensuite l'embedding de la requete avec la matrice pour identifier les contenus les plus pertinents,
-et ainsi enrichir la requête. 
+et ainsi enrichir la requête.
 
 La comparaison se fait par defaut en utilisant la similarité cosine, soit :
+
 ```Latex
 similarité = sin(Angle entre les deux vecteurs)
 --> retourne un score de similarité compris entre 0 et 1
 ```
+
 Elle peut aussi se faire par similarité euclidienne ou par produit scalaire.
 Cela est configurable depuis `config/config.ts`
 
 ## Vector store
+
 Les emebeddings sont enregistrés dans le vectorStore (mémoire). Celui-ci est réinitialisé à la fermeture de programme (store non persistent).
-
-
 
 ## Installation
 
@@ -38,8 +39,7 @@ ollama pull qwen2.5:0.5b
 ollama pull nomic-embed-text
 ```
 
-
-Puis 
+Puis
 
 ```bash
 npm install
@@ -89,6 +89,11 @@ export const config: BaseConfig = {
 ### CLI Interactif
 
 ```bash
+#Pour accès global (depuis n'importe quel path)
+npm link
+skepticism
+
+#Accès local : confiné au dossier contenant le code
 npm run cli
 ```
 
@@ -97,106 +102,126 @@ npm run cli
 - `search <query>` - Recherche avec analyse automatique et enrichissement web si nécessaire
 - `add-web <query>` - Ajouter du contenu depuis le web avec analyse intelligente
 - `add-file <path>` - Ajouter un fichier texte à la base
+- `add-folder <path>` - Ajouter les contenus d'un dossier à la base
+- `file:<file>` - Utiliser un fichier de la base comme référence
+- `folder:<path>` - Utiliser les contenus d'un dossier comme référence
 - `stats` - Afficher les statistiques de la base
 - `clear` - Vider la base de connaissances
 - `help` - Afficher l'aide
 - `exit` - Quitter
 
-
 ### Serveur web
-```bash
-npm run dev #Développement 
-npm run build 
-npm start #Version build  
-```
 
+```bash
+npm run dev #Développement
+npm run build
+npm start #Version build
+```
 
 ### Exemples d'utilisation
 
 ```
-Skepticism> Comment fonctionne le machine learning avec des réseaux de neurones
-🔍 Recherche intelligente: "comment fonctionne le machine learning avec des réseaux de neurones"
-✓ Recherche dans la base existante...
-✓ Base existante insuffisante, recherche web en cours...
-
-📊 Analyse automatique:
-  Sujets identifiés: machine, learning, réseaux, neurones
-  Stop words supprimés: comment, fonctionne, le, avec, des, de
-  Requête optimisée: "machine learning réseaux neurones"
-
-✓ 8 nouveaux documents ajoutés
-  Variantes utilisées: machine learning réseaux neurones | machine learning | réseaux neurones
-
+Skepticism> add-file smartcontract.rs
+✓ Embeddings générés pour 29 texte(s) en 0.55s
+Skepticism> que fais le smartcontract
+Analysé smartcontract.rs
+⠏ Recherche dans la base existante...
+ Recherche RAG terminée en 4366ms avec 15 sources
 ✓ Recherche terminée!
 
-┌─ RÉPONSE──────────────────────────────────────────────────────
-│ Le machine learning avec des réseaux de neurones fonctionne en...
-│ [Réponse détaillée basée sur le contenu enrichi]
-└─────────────────────────────────────────────────────────────
+┌─ RÉPONSE──────────────────────────────────────────────────
+│
+│ - DÉFINITION DU SMART CONTRACT
+│ ==============================
+│
+│ Le smart contract est une application logicielle qui exécute des
+│ instructions de manière décentralisée et sécurisée. Dans ce cas, le smart
+│ contract est utilisé pour gérer les flux de prêt (flash-loan) entre deux
+│ programmes : Orca et Raydium.
+│
+│
+│ ▶ FLUX DE PRÊT
+│ ──────────────
+│
+│ Le processus de prêt fonctionne comme suit :
+│ 1.  Préparation du contexte : Le client crée un contexte de flash-loan en
+│ fournissant des informations sur le programme à utiliser (Orca ou Raydium),
+│ la quantité d'argent à emprunter, les paramètres de classement et les
+│ conditions de paiement.
+│ 2.  Exécution du prêt : Le smart contract exécute le prêt en utilisant les
+│ informations fournies dans l'étape précédente.
+│
+│
+│ ▶ EXÉCUTION DU SMART CONTRACT
+│ ─────────────────────────────
+│    Le smart contract vérifie les conditions d'exécution (par exemple, si le
+│ programme est autorisé à être utilisé) avant de procéder.
+│    Il utilise des instructions cpi_proxy_invoke pour appeler les functions du
+│ programme cible (Orca ou Raydium).
+│ •   Il traite les gains et les pertes dans le cas d'une transaction
+│ réussie.
+│
+│ En résumé, le smart contract est une solution sécurisée pour gérer les flux
+│ de prêt entre des programmes décentralisés.
+└─────────────────────────────────────────────────────────
 
 📚 Sources:
-  1 https://example.com/neural-networks-guide
-  2 https://example.com/ml-fundamentals
+  1 smartcontract.rs
 ```
-
-
 
 ## Limitations du Rag
 
+La transformation du contenu ajouté en embeddings peut prendre un certain temps. c'est le principal goulot d'étranglement de ce système. On pourrait utiliser un modèle plus petit pour générer les embeddings, comme "miniailm", ou passer le texte de la recherche web / document directement, mais on perdrait en qualité sur le ranking des chunks, et la réponse finale pourrait être moins pertinente
 
-La transformation du contenu ajouté en embeddings peut prendre un certain temps. c'est le principal goulot d'étranglement de ce système. On pourrait utiliser un odèle plus petit pour générer les embeddings, comme "miniailm", ou passer le texte de la recherche web / document directement, mais on perdrait le ranking des chunks, et la réponse finale pourrait être moins pertinente
-
-
-
-## Architecture 
-
+## Architecture
 
 ### Injection de dépendences avec Awilix
+
 le RAG est orchéstré par la classe `services/rag.service.ts` la classe doit être instanciée avec un objet `{di}`, exporté depuis `services/di-container` qui expose les services et gère les états, pour éviter la multi-instanciation des classes et la perte des états
 
 ```typescript
 export const di = {
-    aiService: container.resolve<OllamaService>("aiService"),
-    vectorStore: container.resolve<VectorStore>("vectorStore"),
-    searchService: container.resolve<SearchService>("searchService"),
-    textChunker: container.resolve<TextChunker>("textChunker")
-}
+  aiService: container.resolve<OllamaService>("aiService"),
+  vectorStore: container.resolve<VectorStore>("vectorStore"),
+  searchService: container.resolve<SearchService>("searchService"),
+  textChunker: container.resolve<TextChunker>("textChunker"),
+};
 ```
 
-
 puis, on initialise le RagService en lui passant l'objet `{di}`
+
 ```typescript
 const ragService = new RAGService(di);
 ```
+
 ### Fonction "Factory" performSearch
+
 Permet de changer le moteur de recherche utilisé par le RAG, en une seule ligne, depuis la config
+
 ```typescript
 export async function performSearch(
-    query: string,
-    searchEngine: SearchEngine,
-    config: WebSearchConfig,
-    userAgent: string
+  query: string,
+  searchEngine: SearchEngine,
+  config: WebSearchConfig,
+  userAgent: string
 ): Promise<SearchResult[]> {
-
-    switch (searchEngine) {
-        case 'duckduckgo':
-            return await searchDuckDuckGo(query, config, userAgent);
-        case "bing":
-            return await searchWithBing(query, config, userAgent)
-        case "google":
-            return await searchWithGoogle(query, config, userAgent)
-        default:
-            return await searchDuckDuckGo(query, config, userAgent);
-    }
+  switch (searchEngine) {
+    case "duckduckgo":
+      return await searchDuckDuckGo(query, config, userAgent);
+    case "bing":
+      return await searchWithBing(query, config, userAgent);
+    case "google":
+      return await searchWithGoogle(query, config, userAgent);
+    default:
+      return await searchDuckDuckGo(query, config, userAgent);
+  }
 }
 ```
 
+## Contribution
 
-
-
-## Contribution 
 Toutes les contributions sont les bienvenues !
 
-
 ## Licence
+
 MIT

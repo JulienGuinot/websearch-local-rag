@@ -16,7 +16,7 @@ export interface BaseConfig {
 export const config: BaseConfig = {
   ollama: {
     baseUrl: "http://localhost:11434",
-    model: "mistral:latest",
+    model: "llama3.2:latest",
     embeddingModel: "nomic-embed-text",
     temperature: 0.7,
     maxTokens: 2048,
@@ -30,7 +30,7 @@ export const config: BaseConfig = {
     overlap: 100,
   },
   retrieval: {
-    topK: 7,
+    topK: 15,
     threshold: 0.75,
   },
   webSearch: {
