@@ -16,6 +16,7 @@ export interface Chunk {
   content: string;
   embedding?: number[];
   metadata: Document['metadata'];
+  similarity?:number
 }
 
 export interface SearchQuery {

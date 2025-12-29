@@ -1,24 +1,18 @@
 
 import { config } from '../config/config';
-import { OllamaConfig } from '../types/rag';
-
+import { Chunk, OllamaConfig } from '../types/rag';
+    
+export interface Message {
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+}
 export class OllamaService {
     private readonly config: OllamaConfig = config.ollama
-
-    // constructor(config: OllamaConfig) {
-    //     // this.config = {
-    //     //     baseUrl: config.baseUrl ?? 'http://localhost:11434',
-    //     //     model: config.model,
-    //     //     embeddingModel: config.embeddingModel ?? 'nomic-embed-text',
-    //     //     temperature: config.temperature ?? 0.7,
-    //     //     maxTokens: config.maxTokens ?? 2048
-    //     // };
-    // }
+    private conversationHistory: Message[] = []; // Stocke l'historique
 
 
     async generateEmbedding(text: string): Promise<number[]> {
         try {
-            // Vérification du modèle d'abord
             await this._ensureModelExists();
 
             const response = await fetch(`${this.config.baseUrl}/api/embeddings`, {
@@ -50,15 +44,11 @@ export class OllamaService {
         }
     }
 
-    /**
-     * Génère des embeddings pour plusieurs textes
-     */
+
     async generateEmbeddings(texts: string[]): Promise<number[][]> {
         const startTime = performance.now();
 
         try {
-            //await this._ensureModelExists();
-
             const response = await fetch(`${this.config.baseUrl}/api/embed`, {
                 method: 'POST',
                 headers: {
@@ -78,7 +68,6 @@ export class OllamaService {
             }
 
             const data: any = await response.json();
-            console.log("EMBEDDINGS response: ", data)
 
             if (!data.embeddings || !Array.isArray(data.embeddings)) {
                 throw new Error('Format de réponse embeddings invalide');
@@ -100,44 +89,52 @@ export class OllamaService {
         }
     }
 
-    /**
-     * Génère une réponse avec le contexte fourni
-     */
-    async generateResponse(prompt: string, context: string[]): Promise<string> {
-        try {
-            const systemPrompt = this._buildSystemPrompt();
-            const userPrompt = this._buildUserPrompt(prompt, context);
 
-            const response = await fetch(`${this.config.baseUrl}/api/generate`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    model: this.config.model,
-                    prompt: `${systemPrompt}\n\n${userPrompt}`,
-                    stream: false,
-                    options: {
-                        temperature: this.config.temperature,
-                        num_predict: this.config.maxTokens,
-                    }
-                })
-            });
 
-            if (!response.ok) {
-                throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+
+// Ajoute un paramètre optionnel pour l'historique
+async generateResponse(
+    query: string,
+    context: Chunk[],
+): Promise<string> {
+    const systemPrompt = this._buildSystemPrompt();
+    const contextPrompt = this._buildUserPrompt(query, context);
+
+    const messages: Message[] = [
+        { role: 'system', content: systemPrompt },
+        ...this.conversationHistory.slice(0,10),  
+        { role: 'user', content: contextPrompt + `\n\nQuestion: ${query}` }
+    ];
+
+    const response = await fetch(`${this.config.baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: this.config.model,
+            messages,
+            stream: false,
+            options: {
+                temperature: this.config.temperature,
+                num_predict: this.config.maxTokens,
             }
+        })
+    });
 
-            const data: any = await response.json();
-            return data.response;
-        } catch (error: any) {
-            throw new Error(`Erreur génération réponse: ${error.message}`);
-        }
+    if (!response.ok) {
+        const err = await response.text();
+        throw new Error(`Ollama chat error: ${response.status} - ${err}`);
     }
 
-    /**
-     * Vérifie si Ollama est disponible
-     */
+    const data:any = await response.json();
+
+    this.conversationHistory.push(
+        {role:"user", content:query},
+        {role:"assistant", content:query}
+    )
+    return data.message.content.trim();
+}
+
+
     async isAvailable(): Promise<boolean> {
         try {
             const response = await fetch(`${this.config.baseUrl}/api/tags`);
@@ -147,9 +144,7 @@ export class OllamaService {
         }
     }
 
-    /**
-     * Liste les modèles disponibles
-     */
+
     async listModels(): Promise<string[]> {
         try {
             const response = await fetch(`${this.config.baseUrl}/api/tags`);
@@ -164,9 +159,7 @@ export class OllamaService {
         }
     }
 
-    /**
-     * Vérifie qu'un modèle existe et le télécharge si nécessaire
-     */
+ 
     private async _ensureModelExists(): Promise<void> {
         try {
             const models = await this.listModels();
@@ -175,7 +168,6 @@ export class OllamaService {
             );
 
             if (!embeddingModelExists) {
-                console.log(`Modèle d'embedding ${this.config.embeddingModel} non trouvé. Modèles disponibles:`, models);
                 throw new Error(`Modèle d'embedding '${this.config.embeddingModel}' non installé. Installez-le avec: ollama pull ${this.config.embeddingModel}`);
             }
         } catch (error: any) {
@@ -186,60 +178,33 @@ export class OllamaService {
         }
     }
 
-    /**
-     * Teste la génération d'embedding avec un texte simple
-     */
-    async testEmbedding(): Promise<{ success: boolean; error?: string; dimensions?: number }> {
-        try {
-            const testText = "test";
-            const embedding = await this.generateEmbedding(testText);
-            return {
-                success: true,
-                dimensions: embedding.length
-            };
-        } catch (error: any) {
-            return {
-                success: false,
-                error: error.message
-            };
-        }
-    }
 
     private _buildSystemPrompt(): string {
-        return `You are an AI assistant specialized in research and information analysis.
-    Your role is to answer questions using only the information provided in the context.
+        return `Tu es un assistant IA spécialisé en recherche et analyse d'informations.
+                Ton rôle est de répondre aux questions en utilisant exclusivement les informations fournies dans le contexte.
 
-    Instructions:
-
-        Base your answers on the provided context
-
-        If the information is not in the context, clearly state it
-
-        Be precise and concise, but keep a humorous tone, add emojis
-
-        No need for greetings or polite formulas — just give the answer, directly
-
-        Structure your answer clearly in Markdown format
-
-        `
-
-            ;
+                Instructions :
+                - Base tes réponses uniquement sur le contexte fourni
+                - Si l'information n'est pas dans le contexte, indique-le clairement
+                - Sois précis et concis, réponds toujours dans la langue de la question
+                - Pas de salutations ni de formules de politesse — réponse directe uniquement
+                - Structure ta réponse clairement en Markdown
+                - Si le contexte est insuffisant ou si tu ne sais pas, réponds simplement "IDK"`.trim();
     }
 
-    private _buildUserPrompt(query: string, context: string[]): string {
+    private _buildUserPrompt(query: string, context: Chunk[]): string {
         const contextText = context
-            .map((chunk, index) => `[Source ${index + 1}]\n${chunk}`)
+            .map((chunk, index) => `[Source ${chunk.metadata.title} ${index + 1}]\n${chunk.content}`)
             .join('\n\n---\n\n');
 
         return `Contexte:
-${contextText}
-
-Question: ${query}
-
-Réponse:`;
+        ${contextText}
+        Question: ${query}`;
     }
 
-    get modelName(): string {
-        return this.config.model;
+
+    clearHistory() : void {
+        this.conversationHistory = []
     }
+
 }

@@ -27,7 +27,7 @@ export async function fetchWithRetry(
             return await response.text();
         } catch (err: any) {
             lastError = err;
-            console.log(`⚠️ Retry ${attempt}/${maxRetries} for ${url.substring(0, 50)}...`);
+            console.log(`Retry en cours ${attempt}/${maxRetries} pour ${url.substring(0, 50)}...`);
 
             if (attempt < maxRetries) {
                 await new Promise(r => setTimeout(r, (config.retryDelay || 500) * attempt));

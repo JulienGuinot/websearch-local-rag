@@ -93,7 +93,7 @@ app.post('/add-document', async (req, res) => {
 
 app.get('/stats', async (req, res) => {
     try {
-        const stats = await ragService.getStats();
+        const stats = await di.vectorStore.getStats();
         res.json(stats);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -133,11 +133,10 @@ app.get('/models', async (req, res) => {
 
 app.get('/health', async (req, res) => {
     try {
-        const stats = await ragService.getStats();
+        const stats = await di.vectorStore.getStats();
         res.json({
             status: 'healthy',
-            ollama: stats.ollama.available,
-            chunks: stats.vectorStore.totalChunks
+            chunks: stats.totalChunks
         });
     } catch (error: any) {
         res.status(500).json({
