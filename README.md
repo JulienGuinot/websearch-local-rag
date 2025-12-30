@@ -54,7 +54,7 @@ La configuration du rag se fait dans le fichier config/config.ts
 export const config: BaseConfig = {
     ollama: {
         baseUrl: 'http://localhost:11434',
-        model: process.env.MODEL || 'qwen2.5:0.5b',
+        model:  'qwen2.5:0.5b',
         embeddingModel: 'nomic-embed-text',
         temperature: 0.7,
         maxTokens: 2048
