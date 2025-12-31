@@ -103,6 +103,13 @@ export class RAGCLI extends BaseContext {
       if (initialResult.sources.length === 0) needsMoreContent = true;
       if (initialResult.answer.includes("IDK")) needsMoreContent = true;
 
+      // On empêche la recherche web si le client n'est pas connecté
+      if (!(await hasInternetConnection())) {
+        console.warn(
+          "Pas de connexion internet → on désactive la recherche web"
+        );
+        needsMoreContent = false;
+      }
       if (needsMoreContent) {
         stopSpinner(
           currentSpinner,

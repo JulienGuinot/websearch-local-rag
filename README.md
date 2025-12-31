@@ -1,28 +1,34 @@
-# RAG (Retrieval-Augmented Generation) local
+# RAG local + Websearch
+
+### Skepticism
 
 Service RAG avancé avec recherche web et ajout de documents.
 Le contenu est transformé en sa représentation sémantique vectorielle (embeddings), puis stocké dans une matrice (VectorStore).
 On compare ensuite l'embedding de la requete avec la matrice pour identifier les contenus les plus pertinents,
-et ainsi enrichir la requête.
+et ainsi enrichir la requête.\
+Le projet n'a pas pour vocation de remplacer des LLM plus poussés et utilisés (Perplexity, Anthropic, Mistral etc), mais plutot de comprendre comment les représentations sémantiques fonctionnent, et d'obtenir un assistant hors-ligne capable de lire des fichiers.
 
-La comparaison se fait par defaut en utilisant la similarité cosine, soit :
+La comparaison se fait par defaut en utilisant le produit scalaire, soit :
 
-```Latex
-similarité = sin(Angle entre les deux vecteurs)
---> retourne un score de similarité compris entre 0 et 1
+```typescript
+export function dotProduct(vec1: number[], vec2: number[]): number {
+  return vec1.reduce((sum, val, i) => sum + val * vec2[i], 0);
+}
 ```
 
-Elle peut aussi se faire par similarité euclidienne ou par produit scalaire.
+Elle peut aussi se faire par similarité cosine ou euclidienne.\
 Cela est configurable depuis `config/config.ts`
 
 ## Vector store
 
-Les emebeddings sont enregistrés dans le vectorStore (mémoire). Celui-ci est réinitialisé à la fermeture de programme (store non persistent).
+Les embeddings sont enregistrés dans le VectorStore (mémoire). Celui-ci est réinitialisé à la fermeture de programme (store non persistent).
+On pourrait utiliser une base de données spécialisée (Pinecone, Chromadb, etc...) mais à mesure qu'on y ajouterait du contenu,
+la récupération de sources par rapport à une requête pourrait perdre en pertinence. Stocker en mémoire est un choix personnel pour conserver une pertinence des sources à chaque utilisation, et offrir une expérience plus satisfaisante.
 
 ## Installation
 
 ```bash
-git clone https://github.com/JulienGuinot/Skepticism
+git clone https://github.com/JulienGuinot/websearch-local-rag
 ```
 
 ssurez-vous qu'Ollama est installé et en cours d'exécution :
@@ -61,7 +67,7 @@ export const config: BaseConfig = {
     },
     vectorStore: {
         dimensions: 768,
-        similarity: 'cosine'
+        similarity: 'dot'
     },
     chunking: {
         maxChunkSize: 500,
@@ -118,11 +124,13 @@ npm run build
 npm start #Version build
 ```
 
-### Exemples d'utilisation
+## Exemples d'utilisation CLI
+
+### Exemple avec un fichier
 
 ```
 Skepticism> add-file smartcontract.rs
-✓ Embeddings générés pour 29 texte(s) en 0.55s
+✓ Embeddings générés pour 29 chunks en 0.55s
 Skepticism> que fais le smartcontract
 Analysé smartcontract.rs
 ⠏ Recherche dans la base existante...
@@ -169,9 +177,55 @@ Analysé smartcontract.rs
   1 smartcontract.rs
 ```
 
+### Exemple avec un dossier:
+
+```
+Skepticism> add-folder dogs
+⏭️  Dossier ignoré: .git
+✓ Embeddings générés pour 7 chunks en 0.37s
+✓ Embeddings générés pour 1 chunks en 0.02s
+✓ Embeddings générés pour 5 chunks en 0.06s
+✓ Embeddings générés pour 5 chunks en 0.05s
+✓ Embeddings générés pour 1 chunks en 0.02s
+⏭️  Dossier ignoré: venv
+⏭️  Dossier ignoré: __pycache__
+Skepticism> Que fais ce projet
+Analysé inference.py
+Analysé README.md
+Analysé classifier.py
+Analysé gpus_available.py
+⠋ Recherche dans la base existante...
+ Recherche RAG terminée en 5601ms avec 15 sources
+✓ Recherche terminée!
+
+┌─ RÉPONSE──────────────────────────────────────────────────
+│ Ce projet est un classificateur de races de chiens basé sur le deep
+│ learning. Il utilise une approche de transfer learning avec MobileNetV2
+│ pré-entraîné sur ImageNet pour classifier les images de chiens parmi 120
+│ races du dataset Stanford Dogs. Le projet permet d'inférer la race d'un
+│ chien à partir d'une image, en prédissant la classe la plus probable de
+│ l'image dans le dataset.
+└─────────────────────────────────────────────────────────
+
+📚 Sources:
+  1 inference.py
+  2 README.md
+  3 classifier.py
+  4 gpus_available.py
+Skepticism>
+```
+
 ## Limitations du Rag
 
-La transformation du contenu ajouté en embeddings peut prendre un certain temps. c'est le principal goulot d'étranglement de ce système. On pourrait utiliser un modèle plus petit pour générer les embeddings, comme "miniailm", ou passer le texte de la recherche web / document directement, mais on perdrait en qualité sur le ranking des chunks, et la réponse finale pourrait être moins pertinente
+La transformation du contenu ajouté en embeddings peut prendre un certain temps. c'est le principal goulot d'étranglement de ce système. On pourrait utiliser un modèle plus petit pour générer les embeddings, comme "miniailm", ou passer le texte de la recherche web / document directement, mais on perdrait en qualité sur le ranking des chunks, et la réponse finale pourrait être moins pertinente.
+Plus le modèle d'embedding est petit, plus la dimension des embeddings (nombre de composants d'un vecteur) de sortie est petite :
+
+#### Pour se rendre compte :
+
+```
+miniailm -> 384 dimensions soit un vecteur contenant 384 éléments
+nomic-embed-text -> 768 dimensions soit un vecteur comprenant 768 éléments
+```
 
 ## Architecture
 
@@ -197,6 +251,8 @@ const ragService = new RAGService(di);
 ### Fonction "Factory" performSearch
 
 Permet de changer le moteur de recherche utilisé par le RAG, en une seule ligne, depuis la config
+
+- A noter que Google ne ne fonctionne jamais durablement (les sélécteurs html/css changent régulièrement)
 
 ```typescript
 export async function performSearch(

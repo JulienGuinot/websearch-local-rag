@@ -75,7 +75,7 @@ export class OllamaService {
       const duration = ((endTime - startTime) / 1000).toFixed(2);
 
       console.log(
-        `✓ Embeddings générés pour ${texts.length} texte(s) en ${duration}s`
+        `✓ Embeddings générés pour ${texts.length} chunks en ${duration}s`
       );
 
       return data.embeddings;
