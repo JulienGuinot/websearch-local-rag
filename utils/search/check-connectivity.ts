@@ -1,4 +1,4 @@
-async function hasInternetConnection(): Promise<boolean> {
+export async function hasInternetConnection(): Promise<boolean> {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout

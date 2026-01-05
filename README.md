@@ -2,28 +2,27 @@
 
 ### Skepticism
 
-Service RAG avancé avec recherche web et ajout de documents.
-Le contenu est transformé en sa représentation sémantique vectorielle (embeddings), puis stocké dans une matrice (VectorStore).
-On compare ensuite l'embedding de la requete avec la matrice pour identifier les contenus les plus pertinents,
-et ainsi enrichir la requête.\
-Le projet n'a pas pour vocation de remplacer des LLM plus poussés et utilisés (Perplexity, Anthropic, Mistral etc), mais plutot de comprendre comment les représentations sémantiques fonctionnent, et d'obtenir un assistant hors-ligne capable de lire des fichiers.
+Advanced RAG service with web search and document addition capabilities.
+Content is transformed into its semantic vector representation (embeddings) and stored in a matrix (VectorStore).
+The embedding of the query is then compared with the matrix to identify the most relevant content,
+thus enriching the query.\
+This project is not intended to replace more advanced LLMs (Perplexity, Anthropic, Mistral, etc.), but rather to understand how semantic representations work and obtain an offline assistant capable of reading files.
 
-La comparaison se fait par defaut en utilisant le produit scalaire, soit :
+By default, comparison is done using the dot product:
 
 ```typescript
 export function dotProduct(vec1: number[], vec2: number[]): number {
   return vec1.reduce((sum, val, i) => sum + val * vec2[i], 0);
-}
 ```
 
-Elle peut aussi se faire par similarité cosine ou euclidienne.\
-Cela est configurable depuis `config/config.ts`
+It can also be done using cosine or Euclidean similarity.\
+This is configurable from `config/config.ts`
 
 ## Vector store
 
-Les embeddings sont enregistrés dans le VectorStore (mémoire). Celui-ci est réinitialisé à la fermeture de programme (store non persistent).
-On pourrait utiliser une base de données spécialisée (Pinecone, Chromadb, etc...) mais à mesure qu'on y ajouterait du contenu,
-la récupération de sources par rapport à une requête pourrait perdre en pertinence. Stocker en mémoire est un choix personnel pour conserver une pertinence des sources à chaque utilisation, et offrir une expérience plus satisfaisante.
+Embeddings are stored in the VectorStore (memory). It is reinitialized when the program closes (non-persistent store).
+You could use a specialized database (Pinecone, Chromadb, etc.), but as you add more content,
+retrieving sources in relation to a query could lose relevance. Storing in memory is a personal choice to maintain source relevance with each use and provide a more satisfying experience.
 
 ## Installation
 
@@ -31,21 +30,21 @@ la récupération de sources par rapport à une requête pourrait perdre en pert
 git clone https://github.com/JulienGuinot/websearch-local-rag
 ```
 
-ssurez-vous qu'Ollama est installé et en cours d'exécution :
+Ensure that Ollama is installed and running:
 
 ```bash
-# Installer Ollama
+# Install Ollama
 curl -fsSL https://ollama.ai/install.sh | sh
 
-# Démarrer le service
+# Start the service
 ollama serve
 
-# Télécharger les modèles nécessaires
+# Download necessary models
 ollama pull qwen2.5:0.5b
 ollama pull nomic-embed-text
 ```
 
-Puis
+Then
 
 ```bash
 npm install
@@ -54,7 +53,7 @@ npm run dev
 
 ## Configuration
 
-La configuration du rag se fait dans le fichier config/config.ts
+RAG configuration is done in the config/config.ts file
 
 ```typescript
 export const config: BaseConfig = {
@@ -90,48 +89,48 @@ export const config: BaseConfig = {
     }
 ```
 
-## Utilisation
+## Usage
 
-### CLI Interactif
+### Interactive CLI
 
 ```bash
-#Pour accès global (depuis n'importe quel path)
+# For global access (from any path)
 npm link
 skepticism
 
-#Accès local : confiné au dossier contenant le code
+# Local access: confined to the folder containing the code
 npm run cli
 ```
 
-### Commandes disponibles
+### Available Commands
 
-- `search <query>` - Recherche avec analyse automatique et enrichissement web si nécessaire
-- `add-web <query>` - Ajouter du contenu depuis le web avec analyse intelligente
-- `add-file <path>` - Ajouter un fichier texte à la base
-- `add-folder <path>` - Ajouter les contenus d'un dossier à la base
-- `file:<file>` - Utiliser un fichier de la base comme référence
-- `folder:<path>` - Utiliser les contenus d'un dossier comme référence
-- `stats` - Afficher les statistiques de la base
-- `clear` - Vider la base de connaissances
-- `help` - Afficher l'aide
-- `exit` - Quitter
+- `search <query>` - Search with automatic analysis and web enrichment if necessary
+- `add-web <query>` - Add content from the web with intelligent analysis
+- `add-file <path>` - Add a text file to the database
+- `add-folder <path>` - Add folder contents to the database
+- `file:<file>` - Use a file from the database as reference
+- `folder:<path>` - Use folder contents as reference
+- `stats` - Display database statistics
+- `clear` - Clear the knowledge base
+- `help` - Display help
+- `exit` - Exit
 
-### Serveur web
+### Web Server
 
 ```bash
-npm run dev #Développement
+npm run dev # Development
 npm run build
-npm start #Version build
+npm start # Build version
 ```
 
-## Exemples d'utilisation CLI
+## CLI Usage Examples
 
-### Exemple avec un fichier
+### Example with a file
 
 ```
 Skepticism> add-file smartcontract.rs
 ✓ Embeddings générés pour 29 chunks en 0.55s
-Skepticism> que fais le smartcontract
+Skepticism> what does the smartcontract do
 Analysé smartcontract.rs
 ⠏ Recherche dans la base existante...
  Recherche RAG terminée en 4366ms avec 15 sources
@@ -139,45 +138,45 @@ Analysé smartcontract.rs
 
 ┌─ RÉPONSE──────────────────────────────────────────────────
 │
-│ - DÉFINITION DU SMART CONTRACT
-│ ==============================
+│ - SMART CONTRACT DEFINITION
+│ ============================
 │
-│ Le smart contract est une application logicielle qui exécute des
-│ instructions de manière décentralisée et sécurisée. Dans ce cas, le smart
-│ contract est utilisé pour gérer les flux de prêt (flash-loan) entre deux
-│ programmes : Orca et Raydium.
-│
-│
-│ ▶ FLUX DE PRÊT
-│ ──────────────
-│
-│ Le processus de prêt fonctionne comme suit :
-│ 1.  Préparation du contexte : Le client crée un contexte de flash-loan en
-│ fournissant des informations sur le programme à utiliser (Orca ou Raydium),
-│ la quantité d'argent à emprunter, les paramètres de classement et les
-│ conditions de paiement.
-│ 2.  Exécution du prêt : Le smart contract exécute le prêt en utilisant les
-│ informations fournies dans l'étape précédente.
+│ The smart contract is a software application that executes
+│ instructions in a decentralized and secure manner. In this case, the smart
+│ contract is used to manage flash-loan flows between two
+│ programs: Orca and Raydium.
 │
 │
-│ ▶ EXÉCUTION DU SMART CONTRACT
-│ ─────────────────────────────
-│    Le smart contract vérifie les conditions d'exécution (par exemple, si le
-│ programme est autorisé à être utilisé) avant de procéder.
-│    Il utilise des instructions cpi_proxy_invoke pour appeler les functions du
-│ programme cible (Orca ou Raydium).
-│ •   Il traite les gains et les pertes dans le cas d'une transaction
-│ réussie.
+│ ▶ LOAN FLOW
+│ ───────────
 │
-│ En résumé, le smart contract est une solution sécurisée pour gérer les flux
-│ de prêt entre des programmes décentralisés.
+│ The lending process works as follows:
+│ 1. Context preparation: The client creates a flash-loan context by
+│ providing information about the program to use (Orca or Raydium),
+│ the amount of money to borrow, ranking parameters and
+│ payment conditions.
+│ 2. Loan execution: The smart contract executes the loan using
+│ information provided in the previous step.
+│
+│
+│ ▶ SMART CONTRACT EXECUTION
+│ ──────────────────────────
+│ The smart contract verifies execution conditions (for example, if the
+│ program is authorized to be used) before proceeding.
+│ It uses cpi_proxy_invoke instructions to call functions of the
+│ target program (Orca or Raydium).
+│ • It handles gains and losses in the case of a successful
+│ transaction.
+│
+│ In summary, the smart contract is a secure solution for managing
+│ loan flows between decentralized programs.
 └─────────────────────────────────────────────────────────
 
 📚 Sources:
   1 smartcontract.rs
 ```
 
-### Exemple avec un dossier:
+### Example with a folder:
 
 ```
 Skepticism> add-folder dogs
@@ -189,7 +188,7 @@ Skepticism> add-folder dogs
 ✓ Embeddings générés pour 1 chunks en 0.02s
 ⏭️  Dossier ignoré: venv
 ⏭️  Dossier ignoré: __pycache__
-Skepticism> Que fais ce projet
+Skepticism> What does this projet do
 Analysé inference.py
 Analysé README.md
 Analysé classifier.py
@@ -199,12 +198,9 @@ Analysé gpus_available.py
 ✓ Recherche terminée!
 
 ┌─ RÉPONSE──────────────────────────────────────────────────
-│ Ce projet est un classificateur de races de chiens basé sur le deep
-│ learning. Il utilise une approche de transfer learning avec MobileNetV2
-│ pré-entraîné sur ImageNet pour classifier les images de chiens parmi 120
-│ races du dataset Stanford Dogs. Le projet permet d'inférer la race d'un
-│ chien à partir d'une image, en prédissant la classe la plus probable de
-│ l'image dans le dataset.
+│ This project is a dog breed classifier based on deep learning. It uses a transfer learning approach with MobileNetV2 pre-trained
+| on ImageNet to classify dog images into 120 breeds from the Stanford Dogs dataset. The project enables dog breed inference from an
+| image by predicting the most probable class corresponding to the input image within the dataset.
 └─────────────────────────────────────────────────────────
 
 📚 Sources:
@@ -212,72 +208,25 @@ Analysé gpus_available.py
   2 README.md
   3 classifier.py
   4 gpus_available.py
-Skepticism>
-```
-
-## Limitations du Rag
-
-La transformation du contenu ajouté en embeddings peut prendre un certain temps. c'est le principal goulot d'étranglement de ce système. On pourrait utiliser un modèle plus petit pour générer les embeddings, comme "miniailm", ou passer le texte de la recherche web / document directement, mais on perdrait en qualité sur le ranking des chunks, et la réponse finale pourrait être moins pertinente.
-Plus le modèle d'embedding est petit, plus la dimension des embeddings (nombre de composants d'un vecteur) de sortie est petite :
-
-#### Pour se rendre compte :
 
 ```
-miniailm -> 384 dimensions soit un vecteur contenant 384 éléments
-nomic-embed-text -> 768 dimensions soit un vecteur comprenant 768 éléments
+
+## RAG Limitations
+
+Transforming added content into embeddings can take some time. This is the main bottleneck of this system. You could use a smaller model to generate embeddings, such as "miniailm", or pass the web search text / document directly, but you would lose quality in chunk ranking, and the final answer could be less relevant.
+The smaller the embedding model, the smaller the dimension of the output embeddings (number of vector components):
+
+#### To get an idea:
+
+```
+miniailm -> 384 dimensions meaning a vector containing 384 elements
+nomic-embed-text -> 768 dimensions meaning a vector containing 768 elements
 ```
 
-## Architecture
+## Contributing
 
-### Injection de dépendences avec Awilix
+All contributions are welcome!
 
-le RAG est orchéstré par la classe `services/rag.service.ts` la classe doit être instanciée avec un objet `{di}`, exporté depuis `services/di-container` qui expose les services et gère les états, pour éviter la multi-instanciation des classes et la perte des états
-
-```typescript
-export const di = {
-  aiService: container.resolve<OllamaService>("aiService"),
-  vectorStore: container.resolve<VectorStore>("vectorStore"),
-  searchService: container.resolve<SearchService>("searchService"),
-  textChunker: container.resolve<TextChunker>("textChunker"),
-};
-```
-
-puis, on initialise le RagService en lui passant l'objet `{di}`
-
-```typescript
-const ragService = new RAGService(di);
-```
-
-### Fonction "Factory" performSearch
-
-Permet de changer le moteur de recherche utilisé par le RAG, en une seule ligne, depuis la config
-
-- A noter que Google ne ne fonctionne jamais durablement (les sélécteurs html/css changent régulièrement)
-
-```typescript
-export async function performSearch(
-  query: string,
-  searchEngine: SearchEngine,
-  config: WebSearchConfig,
-  userAgent: string
-): Promise<SearchResult[]> {
-  switch (searchEngine) {
-    case "duckduckgo":
-      return await searchDuckDuckGo(query, config, userAgent);
-    case "bing":
-      return await searchWithBing(query, config, userAgent);
-    case "google":
-      return await searchWithGoogle(query, config, userAgent);
-    default:
-      return await searchDuckDuckGo(query, config, userAgent);
-  }
-}
-```
-
-## Contribution
-
-Toutes les contributions sont les bienvenues !
-
-## Licence
+## License
 
 MIT

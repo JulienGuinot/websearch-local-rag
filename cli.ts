@@ -14,6 +14,7 @@ import BaseContext from "./contexts/base-context";
 import { RAGService } from "./services/rag.service";
 import { di } from "./services/di-container";
 import { displaySearchResult, showHelp } from "./utils/cli/cli.utils";
+import { hasInternetConnection } from "./utils/search/check-connectivity";
 
 export class RAGCLI extends BaseContext {
   private ragService = new RAGService(this.di);
@@ -98,13 +99,13 @@ export class RAGCLI extends BaseContext {
       let needsMoreContent = false;
       //initialResult.sources.length == 0||
       //initialResult.answer.includes("Je n'ai pas trouvé") ||
-      //initialResult.answer.includes("IDK") ||
       //initialResult.answer.length < 5 ||
       if (initialResult.sources.length === 0) needsMoreContent = true;
       if (initialResult.answer.includes("IDK")) needsMoreContent = true;
 
       // On empêche la recherche web si le client n'est pas connecté
-      if (!(await hasInternetConnection())) {
+      const netHealth = await hasInternetConnection();
+      if (!netHealth) {
         console.warn(
           "Pas de connexion internet → on désactive la recherche web"
         );
@@ -121,7 +122,7 @@ export class RAGCLI extends BaseContext {
         const enrichment = await this.ragService.addFromWebSearch(
           query,
           8,
-          true
+          false
         );
 
         stopSpinner(currentSpinner, "Enrichissement web terminé");
